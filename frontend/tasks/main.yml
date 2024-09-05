@@ -1,0 +1,41 @@
+---
+# tasks file for frontend
+   - name: sudo apt update
+     ansible.builtin.apt:
+        update_cache: yes
+   - name: install nginx
+     apt:
+       name: nginx
+       state: present
+   - name: Ensure Nginx configuration file is present
+     ansible.builtin.copy:
+       dest: /etc/nginx/sites-available/chatapp.conf
+       content: |
+          server {
+              listen 80;
+              server_name _default;
+              location / {
+                  include proxy_params;
+                  proxy_pass http://18.0.232.232:8000;
+              }
+          }
+       mode: '0644'
+   - name: Remove default Nginx virtual host configuration
+     ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+   - name: Create a symbolic link for the chatapp configuration
+     ansible.builtin.file:
+        src: /etc/nginx/sites-available/chatapp.conf
+        dest: /etc/nginx/sites-enabled/chatapp.conf
+        state: link
+
+   - name: Restart Nginx to apply changes
+     ansible.builtin.systemd:
+        name: nginx
+        state: restarted
+   - name: Enable Nginx to start on boot
+     ansible.builtin.systemd:
+        name: nginx
+        enabled: yes

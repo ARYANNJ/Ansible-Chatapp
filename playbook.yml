@@ -1,0 +1,7 @@
+---
+- name: Chatapp instance
+  hosts: frontend
+  become: true
+  roles:
+    - frontend
+

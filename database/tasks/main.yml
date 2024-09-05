@@ -1,0 +1,102 @@
+---
+# tasks file for chatapp 
+#  - name: sudo apt get update
+#    ansible.builtin.apt:
+#        update_cache: yes
+  - name: install mysql-server on database
+    ansible.builtin.apt:
+        name: mysql-server
+        state: present
+  - name: create directory
+    ansible.builtin.file:
+        path: /data
+        state: directory
+        owner: mysql
+        group: mysql
+  - name: Replace bind-address with 0.0.0.0
+    ansible.builtin.lineinfile:
+        path: /etc/mysql/mysql.conf.d/mysqld.cnf
+        regexp: '^bind-address\s*='
+        line: "bind-address = 0.0.0.0"
+        backup: yes
+  - name: Replace mysqlx-bind-address
+    ansible.builtin.lineinfile:
+        path: /etc/mysql/mysql.conf.d/mysqld.cnf
+        regexp: '^mysqlx-bind-address\s*='
+        line: "mysqlx-bind-address=0.0.0.0"
+        backup: yes
+  - name: Stop mysql-server
+    ansible.builtin.systemd:
+        name: mysql
+        state: stopped
+  - name: Start MySQL service
+    ansible.builtin.systemd:
+        name: mysql
+        state: started
+  - name: Ensure MySQL is started
+    ansible.builtin.service:
+        name: mysql
+        state: started
+  - name: Execute MySQL secure installation
+    expect:
+        command: mysql_secure_installation
+        responses:
+          'Enter password for user root:': "123"
+          'Press y\|Y for Yes, any other key for No': 'Y'
+          'Change the password for root \? \(\(Press y\|Y for Yes, any other key for No\)': 'n'
+          'Remove anonymous users\? \(Press y\|Y for Yes, any other key for No\)': 'Y'
+          'Disallow root login remotely\? \(Press y\|Y for Yes, any other key for No\)': 'Y'
+          'Remove test database and access to it\? \(Press y\|Y for Yes, any other key for No\)': 'Y'
+          'Reload privilege tables now\? \(Press y\|Y for Yes, any other key for No\)': 'Y'
+    environment:
+        MYSQL_PWD: "123"
+  - name: ensure mysql is enabled to run on startup  
+    service:
+       name: mysql 
+       state: started
+       enabled: true
+  #  - name: Set root user password
+  #  mysql_user:
+  #     name: root
+  #     password: "123"
+  #      login_unix_socket: /var/run/mysqld/mysqld.sock
+  #     host: localhost
+  #     login_user: root
+  #     login_password: '123'
+  #     state: present
+  - name: Create admin user with remote access
+    mysql_user:
+        name: chatapp
+        password: 123
+        priv: '*.*:ALL'
+        host: '%'
+        append_privs: yes
+        login_user: root
+        login_password: "123"
+        state: present
+  - name: creating database 
+    mysql_db:
+        name: chatapp
+        state: present
+        login_user: root
+        login_password: "123" 
+  - name: Grant all privileges on chatapp database to chatapp user
+    mysql_user:
+       name: chatapp
+       password: 123
+       priv: 'chatapp.*:ALL'  # Grants all privileges on the chatapp database
+       host: '%'
+       append_privs: yes
+       login_user: root
+       login_password: "123"
+       state: present
+  - name: Flush MySQL privileges
+    mysql_query:
+       query: "FLUSH PRIVILEGES;"
+       login_user: root
+       login_password: "123"
+  - name: Ensure MySQL service is enabled and started
+    ansible.builtin.systemd:
+       name: mysql
+       enabled: yes
+       state: started
